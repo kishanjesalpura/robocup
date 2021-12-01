@@ -84,8 +84,9 @@ class Velocity():
 		velX = velocity*cos(angle)
 		velY = velocity*sin(angle)
 		# print(velX,velY,angle,index,self.motionAngle[index])
-		errorX = self.path[index].x - self.currPosition.x
-		errorY = self.path[index].y - self.currPosition.y
+        index1 = min(index+1, len(self.path)-1)
+		errorX = self.path[index].x - self.currPosition.x + 1/10*(self.path[index1].x - self.currPosition.x)
+		errorY = self.path[index].y - self.currPosition.y + 1/10*(self.path[index1].y - self.currPosition.y)
 		# print(velX,velY,errorX,errorY)
 		return velX, velY, errorX, errorY
 	##
@@ -94,7 +95,7 @@ class Velocity():
 	def GetExpectedPositionIndex(self):
 		distance = 0
 		for i in xrange(1,len(self.path)):
-			distance += self.path[i].dist(self.path[i-1])
+			distance += 1.5*self.path[i].dist(self.path[i-1])
 			if distance > self.distance_traversed:
 				return i
 		return -1
