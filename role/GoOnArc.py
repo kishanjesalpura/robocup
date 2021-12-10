@@ -69,6 +69,9 @@ class GoOnArc(behavior.Behavior):
     def add_kub(self,kub):
         self.kub = kub
 
+    def add_target(self,target):
+        self.target = target
+
     def checklist(self):
         center_check = (self.center is None)
         target_check = (self.target is None)
@@ -87,7 +90,7 @@ class GoOnArc(behavior.Behavior):
     def on_enter_setup(self):
         pass
     def execute_setup(self):
-        _GoOnArc_.init(self.kub,self.target,self.theta)
+        _GoOnArc_.init(self.kub,self.target,self.center,False)
         pass
 
     def on_exit_setup(self):

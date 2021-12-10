@@ -6,7 +6,7 @@ from krssg_ssl_msgs.msg import BeliefState
 from krssg_ssl_msgs.msg import gr_Commands
 from krssg_ssl_msgs.msg import gr_Robot_Command
 from krssg_ssl_msgs.msg import BeliefState
-from role import  GoToBall, GoToPoint
+from role import  GoOnArc, GoToPoint
 from multiprocessing import Process
 from kubs import kubs
 from krssg_ssl_msgs.srv import bsServer
@@ -19,10 +19,9 @@ def run_function(id_,state):
 	print(kub.kubs_id)
 	g_fsm = GoOnArc.GoOnArc()
 	g_fsm.add_kub(kub)
-	g_fsm.add_target()
-    center = Vector2D(self.kub.get_pos().x, self.kub.get_pos().y+1800)
-    g_fsm.add_center(center)
-    g_fsm.add_target(Vector2D(center.x+1800, center.y))
+        center = Vector2D(kub.get_pos().x, kub.get_pos().y+1800)
+        g_fsm.add_center(center)
+        g_fsm.add_target(Vector2D(center.x+1800, center.y))
 	print('something before spin')
 	g_fsm.spin()
 	# 

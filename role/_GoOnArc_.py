@@ -24,17 +24,20 @@ vy_end = 0
 
 
 rospy.wait_for_service("bsServer",)
-getState = rospy.ServiceProxy('bsServer',bsServer)
+getState = rospy.ServiceProxy('bsServer',srv.bsServer)
 
-try:
-    prev_state = getState(prev_state).stateB
-except rospy.ServiceException, e:
-    print("Error ", e)
+#try:
+#    prev_state = getState(prev_state).stateB
+#except rospy.ServiceException, e:
+#    print("Error ", e)
 
-def init(_kub,target,rotate):
+def init(_kub,target,center,rotate):
     global kub,TARGET,RADIUS,CENTER,FLAG_move,FIRST_CALL
     kub = _kub
     TARGET = Vector2D()
+    CENTER = Vector2D()
+    CENTER.x = center.x
+    CENTER.y = center.y
     rotate = rotate
     TARGET.x = target.x
     TARGET.y = target.y
