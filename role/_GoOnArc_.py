@@ -26,19 +26,20 @@ vy_end = 0
 rospy.wait_for_service("bsServer",)
 getState = rospy.ServiceProxy('bsServer',srv.bsServer)
 
-#try:
-#    prev_state = getState(prev_state).stateB
-#except rospy.ServiceException, e:
-#    print("Error ", e)
+prev_state = None
+try:
+    prev_state = getState(prev_state).stateB
+except rospy.ServiceException, e:
+    print("Error ", e)
 
-def init(_kub,target,center,rotate):
+def init(_kub,target,center,radius,rotate):
     global kub,TARGET,RADIUS,CENTER,FLAG_move,FIRST_CALL
     kub = _kub
     TARGET = Vector2D()
     CENTER = Vector2D()
     CENTER.x = center.x
     CENTER.y = center.y
-    rotate = rotate
+    RADIUS = radius
     TARGET.x = target.x
     TARGET.y = target.y
     FLAG_move = False
@@ -46,16 +47,14 @@ def init(_kub,target,center,rotate):
 
 def velocity_planner(bot_pos):
     #PD controller
-    consts = np.array([3.5,0.003])
-    theta1 = atan2(bot_pos.y-CENTER.y,bot_pos.x-CENTER.x)
-    theta2 = atan2(TARGET.y-CENTER.y,TARGET.x-CENTER.x)
+    consts = np.array([3.5])
+    theta1 = math.atan2(bot_pos.y-CENTER.y,bot_pos.x-CENTER.x)
+    theta2 = math.atan2(TARGET.y-CENTER.y,TARGET.x-CENTER.x)
     theta = theta2-theta1
-    pd = np.array([[theta*RADIUS],[kub.get_vel().magnitute]])
-    vel = pd.dot(consts)
-    if vel>config.MAX_BOT_SPEED:
-        vel = config.MAX_BOT_SPEED
+    dist = theta*RADIUS
+    vel = dist*consts
     vx = vel*math.sin(theta1)
-    vy = vel*math.cos(theta1)
+    vy = vel*math.cos(theta2)
     return vx,vy
 
 def execute(startTime,DIST_THRESH,avoid_ball=False):
@@ -79,15 +78,15 @@ def execute(startTime,DIST_THRESH,avoid_ball=False):
 
             [vx, vy] = velocity_planner(kub.get_pos())
 
-            if not vw:
-                vw = 0
+            #if not vw:
+            #    vw = 0
 
             if not vx and not vy:
                 vx,vy = vx_end,vy_end
             else:
                 vx_end,vy_end = vx,vy
 
-            if dist(kub.state.homePos[kub.kubs_id], TARGET)<DIST_THRESH :
+            if TARGET.dist(kub.state.homePos[kub.kubs_id])<DIST_THRESH :
                 kub.move(0,0)
                 FLAG_move = True
             else:

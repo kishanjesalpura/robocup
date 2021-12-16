@@ -6,6 +6,7 @@ try:
 except:
     import _GoToPoint_
 import rospy
+import time
 from utils.functions import *
 from utils.config import *
 
@@ -90,20 +91,20 @@ class GoOnArc(behavior.Behavior):
     def on_enter_setup(self):
         pass
     def execute_setup(self):
-        _GoOnArc_.init(self.kub,self.target,self.center,False)
+        _GoOnArc_.init(self.kub,self.target,self.center,self.radius,False)
         pass
 
     def on_exit_setup(self):
         pass
 
     #round_n_round run functions
-    def on_enter_drive(self):
+    def on_enter_round_n_round(self):
         pass
 
     def terminate(self):
         super().terminate()
 
-    def execute_drive(self):
+    def execute_round_n_round(self):
         print("Execute drive")
         start_time = rospy.Time.now()
         start_time = 1.0*start_time.secs + 1.0*start_time.nsecs/pow(10,9)
@@ -112,10 +113,11 @@ class GoOnArc(behavior.Behavior):
         for gf in generatingfunction:
             self.kub,target = gf
 
+            time.sleep(1)
             if not vicinity_points(self.target,target):
                 self.behavior_failed = True
                 break
         self.new_point = self.kub.get_pos()
 
-    def on_exit_drive(self):
+    def on_exit_round_n_round(self):
         pass
