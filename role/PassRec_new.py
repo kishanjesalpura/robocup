@@ -5,11 +5,13 @@ from role import GoToPoint, KickToPoint
 import math
 import kubs
 from utils import math_functions
+from utils.geometry import Vector2D
 from utils.functions import *
 from utils.state_functions import *
 from utils.config import *
 from velocity.run import *
 from krssg_ssl_msgs.srv import *
+from utils.math_functions import *
 import krssg_ssl_msgs.msg
 import _turnAround_, _GoToPoint_
 import time
@@ -20,7 +22,7 @@ DIST_THRESH = 75
 dboxp = Vector2D((abs(OUR_DBOX_X)-(DBOX_HEIGHT/2)),0)
 DRIBBLE_DIST = BOT_RADIUS*10
 BOT_BALL_THRESH = 0.9*BOT_RADIUS
-V_CLOSE=MAX_BOT_SPEED/10
+V_CLOSE=MAX_BOT_SPEED/30
 D_CLOSE=BOT_RADIUS*6
 class Pass_Recieve(behavior.Behavior):
 
@@ -41,13 +43,12 @@ class Pass_Recieve(behavior.Behavior):
         self.behavior_failed = False
         self.DISTANCE_THRESH = BOT_RADIUS 
         self.theta = 0
-        self.course_approach_thresh = BOT_RADIUS*0.1 
-        self.power = 4.0
+        self.course_approach_thresh = BOT_RADIUS 
+        self.power = 3.0
         self.name = "Dribble_Kick"
         self.go_at = None
         self.target_point = None
-        self.dbox = dboxp
-        self.power = 0        
+        self.dbox = dboxp    
         self.approachball = False
         self.turn = False
         self.goto_dribble = False
@@ -88,7 +89,7 @@ class Pass_Recieve(behavior.Behavior):
             Pass_Recieve.State.dribble_kick,lambda: self.goto_dribble,"dribbling")
         
         self.add_transition(Pass_Recieve.State.goal,
-            Pass_Recieve.State.setup,lambda: self.done(), 'pass complete')
+            Pass_Recieve.State.setup,lambda: True, 'pass complete')
         
         self.add_transition(Pass_Recieve.State.setup,
            Pass_Recieve.State.insidealpha,lambda:self.bot_inside_alpha() and (not kub_has_ball(self.kub.state,self.kub.kubs_id)),'inside alpha')
@@ -148,27 +149,26 @@ class Pass_Recieve(behavior.Behavior):
             return True
         return False
     
+    def get_pos_asvec2d(self, point2d):
+        return Vector2D(int(point2d.x),int(point2d.y))
+    
     def reachball(self):
         ballpos = self.kub.state.ballPos
-        theta = angle_diff(ballpos, self.kickto())
-        go_at = getPointBehindTheBall(ballpos, theta, -2)
+        theta = angle_diff(ballpos, self.kickto)
+        go_at = getPointBehindTheBall(ballpos, theta, 2)
+	self.approachball = True
         return not(self.turn) and not(self.goto_dribble) and go_at.dist(self.get_pos_asvec2d(self.kub.get_pos())) >= DISTANCE_THRESH*0.25 and self.approachball
 
     def alignnow(self):
         ballpos = self.kub.state.ballPos
-        theta = angle_diff(ballpos, self.kickto())
-        go_at = getPointBehindTheBall(ballpos, theta, -2)
+        theta = angle_diff(ballpos, self.kickto)
+        go_at = getPointBehindTheBall(ballpos, theta, 2)
         return not (go_at.dist(self.get_pos_asvec2d(self.kub.get_pos())) >= DISTANCE_THRESH*0.25) and self.turn and not(self.goto_dribble)
 		
     def at_DBox(self):
         target = self.kickto()
         curPos = self.kub.get_pos()
         return target.dist(self.get_pos_asvec2d(curPos)) <= DISTANCE_THRESH and self.turndbox
-
-    def done(self):
-        ballpos = self.get_pos_asvec2d(self.kub.state.ballPos)
-        condition = (ballpos.x >= 4500) and (ballpos.y > -300) and (ballpos.y < 300)
-        return condition
 
     def getPointBehindTheBall(self, factor=3.5):
         point = self.kub.state.ballPos
@@ -186,7 +186,10 @@ class Pass_Recieve(behavior.Behavior):
         self.kub.execute()
 
     def bot_inside_alpha(self):
-        veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
+        if self.kub.state.ballVel.x == 0 and self.kub.state.ballVel.y == 0:
+	    veldir = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)   
+        else:
+	    veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
         point = getPointBehindTheBall(self.kub.state.ballPos,veldir)
         #angle = angle_diff(point,self.kub.get_pos())
         angle = math.atan2(point.y - self.kub.get_pos().y,point.x - self.kub.get_pos().x)
@@ -195,11 +198,14 @@ class Pass_Recieve(behavior.Behavior):
         return False
     
     def insideofcircle(self):
-        veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
+	if self.kub.state.ballVel.x == 0 and self.kub.state.ballVel.y == 0:
+	    veldir = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)    
+        else:
+	    veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
         v1 = Vector2D(self.radius*math.sin(self.alpha)*math.cos(veldir),self.radius*math.sin(self.alpha)*math.sin(veldir))
         v2 = Vector2D(-self.radius*math.cos(self.alpha)*math.sin(veldir),self.radius*math.cos(self.alpha)*math.cos(veldir))
         v3 = Vector2D(self.radius*math.cos(self.alpha)*math.sin(veldir),-self.radius*math.cos(self.alpha)*math.cos(veldir))
-        ballPos =Vector2D(self.kub.ballPos.x,self.kub.ballPos.y)
+        ballPos =Vector2D(self.kub.state.ballPos.x,self.kub.state.ballPos.y)
         center1 = ballPos - v1 - v2
         center2 = ballPos - v1 - v3
         self.circle1 = Circle(center1,self.radius)
@@ -215,11 +221,15 @@ class Pass_Recieve(behavior.Behavior):
     def outsideofcircle(self):
         if self.bot_inside_alpha() or self.insideofcircle():
             return False
-        veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
+	print(self.insideofcircle())
+	if self.kub.state.ballVel.x == 0 and self.kub.state.ballVel.y == 0:
+	    veldir = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)    
+        else:
+	    veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
         v1 = Vector2D(self.radius*math.sin(self.alpha)*math.cos(veldir),self.radius*math.sin(self.alpha)*math.sin(veldir))
         v2 = Vector2D(-self.radius*math.cos(self.alpha)*math.sin(veldir),self.radius*math.cos(self.alpha)*math.cos(veldir))
         v3 = Vector2D(self.radius*math.cos(self.alpha)*math.sin(veldir),-self.radius*math.cos(self.alpha)*math.cos(veldir))
-        ballPos =Vector2D(self.kub.ballPos.x,self.kub.ballPos.y)
+        ballPos =Vector2D(self.kub.state.ballPos.x,self.kub.state.ballPos.y)
         center1 = ballPos - v1 - v2
         center2 = ballPos - v1 - v3
         if center2.dist(self.kub.get_pos()) < center1.dist(self.kub.get_pos()):
@@ -243,10 +253,9 @@ class Pass_Recieve(behavior.Behavior):
 
     def on_enter_reach_ball(self):
         self.theta = normalize_angle(angle_diff(self.kub.state.ballPos,self.kickto))
-        self.target_point = self.getPointBehindTheBall(3)
+        self.target_point = getPointBehindTheBall(self.kub.state.ballPos, self.theta, 2)
         #self.target_point = self.kub.state.ballPos
-        _GoToPoint_.init(self.kub, self.target_point, self.theta)
-        pass
+        _GoToPoint_.init(self.kub, self.target_point,0)
 
     def execute_reach_ball(self):
         start_time = rospy.Time.now()
@@ -266,7 +275,7 @@ class Pass_Recieve(behavior.Behavior):
         print("Entering align: ", self.turn)
         ballpos = self.kub.state.ballPos
         self.theta = angle_diff(self.kub.get_pos(),ballpos)
-        self.go_at = getPointBehindTheBall(ballpos, self.theta, -2)
+        self.go_at = getPointBehindTheBall(ballpos, self.theta, 2)
 
     def execute_align(self):
 		
@@ -427,16 +436,13 @@ class Pass_Recieve(behavior.Behavior):
         pass
 
     def execute_insidealpha(self):
-        veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
-        point=getPointBehindTheBall(self.kub.state.ballPos,veldir)
-        theta = math.atan2(point.y-self.kub.get_pos().y, point.x-self.kub.get_pos().x)
-        magnitude=V_CLOSE + dist(point,self.kub.get_pos())(MAX_BOT_SPEED-V_CLOSE)/(D_CLOSE)
-        relvel=Vector2D(magnitude*math.cos(theta),magnitude*math.sin(theta))
-        FinalVel=relvel+self.kub.state.ballVel
-        self.kub.vx=FinalVel.x
-        self.kub.vy=FinalVel.y
-        self.kub.execute()
-        time.sleep(0.1)
+        start_time = rospy.Time.now()
+        start_time = 1.0*start_time.secs + 1.0*start_time.nsecs/pow(10,9)   
+        generatingfunction = _PassRecv_.execute('inside_alpha', start_time, BOT_RADIUS*1.2)
+        for gf in generatingfunction:
+            self.kub,target_point= gf
+            if vicinity_points(self.kub.state.ballPos, self.kub.get_pos(),thresh =  BOT_RADIUS):
+                break
     
     def on_exit_insidealpha(self):
         pass
@@ -445,33 +451,13 @@ class Pass_Recieve(behavior.Behavior):
         pass
     
     def execute_outsidecircle(self):
-        veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
-        point=getPointBehindTheBall(self.kub.state.ballPos,veldir)
-        magnitude=V_CLOSE + dist(point,self.kub.get_pos())*(MAX_BOT_SPEED-V_CLOSE)/(D_CLOSE)
-        l = dist(self.circle.center,self.kub.get_pos())
-        beta = math.asin(self.radius/l)
-        theta = math.atan(self.kub.get_pos().y - self.circle.center.y)/(self.kub.get_pos().x - self.circle.center.x)
-        angle1 = theta + beta
-        angle2 = theta - beta
-        multiplier1 = 1
-        multiplier2 = 1
-    
-        if dist(self.kub.get_pos() + Vector2D(BOT_RADIUS*math.cos(angle1),BOT_RADIUS*math.sin(angle1)),self.circle.center) > dist(self.kub.get_pos() - Vector2D(BOT_RADIUS*math.cos(angle1),BOT_RADIUS*math.sin(angle1)),self.circle.center):
-            multiplier1 = -1
-        if dist(self.kub.get_pos() + Vector2D(BOT_RADIUS*math.cos(angle2),BOT_RADIUS*math.sin(angle2)),self.circle.center) > dist(self.kub.get_pos() - Vector2D(BOT_RADIUS*math.cos(angle2),BOT_RADIUS*math.sin(angle2)),self.circle.center):
-            multiplier2 = -1
-        if (math.cos(veldir)*math.cos(angle1) + math.sin(veldir)*math.sin(angle1))*multiplier1 < (math.cos(veldir)*math.cos(angle2) + math.sin(veldir)*math.sin(angle2))*multiplier2:
-            cosangle = math.cos(angle1)*multiplier1
-            sinangle = math.sin(angle1)*multiplier1
-        else:
-            cosangle = math.cos(angle2)*multiplier2
-            sinangle = math.sin(angle2)*multiplier2
-        relvel=Vector2D(magnitude*cosangle,magnitude*sinangle)
-        FinalVel=relvel+self.kub.state.ballVel
-        self.kub.vx=FinalVel.x
-        self.kub.vy=FinalVel.y
-        self.kub.execute()
-        time.sleep(0.1)
+        start_time = rospy.Time.now()
+        start_time = 1.0*start_time.secs + 1.0*start_time.nsecs/pow(10,9)   
+        generatingfunction = _PassRecv_.execute('outside_circle', start_time, BOT_RADIUS*1.2)
+        for gf in generatingfunction:
+            self.kub,target_point = gf
+            if vicinity_points(self.kub.state.ballPos,self.kub.get_pos(),thresh=BOT_RADIUS):
+                break
 
     def on_exit_outsidecircle(self):
         pass
@@ -479,22 +465,13 @@ class Pass_Recieve(behavior.Behavior):
     def on_enter_insidecircle(self):
         pass
     def execute_insidecircle(self):
-        normal_dir = math.atan2(self.kub.get_pos().y - self.circle.center.y),(self.kub.get_pos().x - self.circle.center.x)
-        veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
-        point=getPointBehindTheBall(self.kub.state.ballPos,veldir)
-        #theta = math.atan2(point.y-self.kub.get_pos().y, point.x-self.kub.get_pos().x)
-        magnitude=V_CLOSE + dist(point,self.kub.get_pos())(MAX_BOT_SPEED-V_CLOSE)/(D_CLOSE)
-        l = dist(self.circle.center,self.kub.get_pos())
-        if self.circle.center == self.circle1.center:
-            relvel_dir = normal_dir + (math.pi*l)/(2*self.circle.radius)
-        if self.circle.center == self.circle2.center:
-            relvel_dir = normal_dir - (math.pi*l)/(2*self.circle.radius)
-        relvel = Vector2D(magnitude*math.cos(relvel_dir),magnitude*math.sin(relvel_dir))
-        FinalVel=relvel+self.kub.state.ballVel
-        self.kub.vx=FinalVel.x
-        self.kub.vy=FinalVel.y
-        self.kub.execute()
-        time.sleep(0.1)
-    
+        start_time = rospy.Time.now()
+        start_time = 1.0*start_time.secs + 1.0*start_time.nsecs/pow(10,9)   
+        generatingfunction = _PassRecv_.execute('inside_circle', start_time, BOT_RADIUS*1.2)
+        for gf in generatingfunction:
+            self.kub,target_point = gf
+            if vicinity_points(self.kub.state.ballPos,self.kub.get_pos(),thresh=BOT_RADIUS):
+                break
     def on_exit_insidecircle(self):
         pass
+

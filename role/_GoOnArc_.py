@@ -18,7 +18,9 @@ TARGET = None
 CENTER = None
 RADIUS = None
 FLAG_move = False
+POINT = None
 rotate = False
+TAKE_BIGGER_ARC = False
 vx_end = 0
 vy_end = 0
 
@@ -32,29 +34,68 @@ try:
 except rospy.ServiceException, e:
     print("Error ", e)
 
-def init(_kub,target,center,radius,rotate):
-    global kub,TARGET,RADIUS,CENTER,FLAG_move,FIRST_CALL
+def init(_kub,target,center,radius,rotate, point, take_bigger_arc):
+    global kub,TARGET,RADIUS,CENTER,FLAG_move,FIRST_CALL,POINT,TAKE_BIGGER_ARC
     kub = _kub
     TARGET = Vector2D()
+    TARGET.x = target.x
+    TARGET.y = target.y
     CENTER = Vector2D()
     CENTER.x = center.x
     CENTER.y = center.y
     RADIUS = radius
-    TARGET.x = target.x
-    TARGET.y = target.y
     FLAG_move = False
     FIRST_CALL = True
+    POINT = point
+    TAKE_BIGGER_ARC = take_bigger_arc
+
+v_tan_prev = 0
+v_norm_prev = 0
 
 def velocity_planner(bot_pos):
+    global v_tan_prev, v_norm_prev
     #PD controller
-    consts = np.array([3.5])
-    theta1 = math.atan2(bot_pos.y-CENTER.y,bot_pos.x-CENTER.x)
-    theta2 = math.atan2(TARGET.y-CENTER.y,TARGET.x-CENTER.x)
-    theta = theta2-theta1
-    dist = theta*RADIUS
-    vel = dist*consts
-    vx = vel*math.sin(theta1)
-    vy = vel*math.cos(theta2)
+    # tangential velocity controller
+    consts_tan = np.array([4,0.05])
+    if POINT is None:
+        theta1 = math.atan2(bot_pos.y-CENTER.y,bot_pos.x-CENTER.x)
+        theta2 = math.atan2(TARGET.y-CENTER.y,TARGET.x-CENTER.x)
+        theta = theta2-theta1
+        theta = functions.normalize_angle(theta)
+        if TAKE_BIGGER_ARC == True:
+            if theta<0:
+                theta = 2*math.pi+theta
+            else:
+                theta = theta-2*math.pi
+    else:
+        theta1 = math.atan2(bot_pos.y-CENTER.y,bot_pos.x-CENTER.x)
+        theta2 = math.atan2(TARGET.y-CENTER.y,TARGET.x-CENTER.x)
+        theta3 = math.atan2(POINT.y-CENTER.y,POINT.x-CENTER.x)
+        alpha1 = functions.normalize_angle(theta3-theta1)
+        alpha2 = functions.normalize_angle(theta2-theta3)
+        theta = alpha1+alpha2
+    dist_tan = theta*RADIUS
+    values_tan = np.array([[dist_tan],[-v_tan_prev]])
+    vel_tangential = consts_tan.dot(values_tan)
+    #print("vel tangential", vel_tangential)
+    #normal velocity controller
+    consts_rad = np.array([4,0.05])
+    radius1 = math.sqrt((bot_pos.y-CENTER.y)**2+(bot_pos.x-CENTER.x)**2)
+    radius2 = math.sqrt((TARGET.y-CENTER.y)**2+(TARGET.x-CENTER.x)**2)
+    dist_radial = radius2-radius1
+    values_rad = np.array([[dist_radial],[-v_norm_prev]])
+    vel_radial = consts_rad.dot(values_rad)
+    #print("vel radial", vel_radial)
+    v_tan_prev = vel_tangential
+    v_norm_prev = vel_radial
+    vx = vel_radial*math.cos(theta1)-vel_tangential*math.sin(theta1)
+    vy = vel_tangential*math.cos(theta1)+vel_radial*math.sin(theta1)
+    if math.sqrt(vx**2+vy**2)>config.MAX_BOT_SPEED:
+        alpha = math.atan2(vy, vx)
+        vx = config.MAX_BOT_SPEED*math.cos(alpha)
+        vy = config.MAX_BOT_SPEED*math.sin(alpha)
+    #print("vx,vy", vx, vy)
+    print("bot_pos", bot_pos)
     return vx,vy
 
 def execute(startTime,DIST_THRESH,avoid_ball=False):
@@ -76,7 +117,7 @@ def execute(startTime,DIST_THRESH,avoid_ball=False):
             t = rospy.Time.now()
             t = t.secs + 1.0*t.nsecs/pow(10,9)
 
-            [vx, vy] = velocity_planner(kub.get_pos())
+            vx, vy = velocity_planner(kub.get_pos())
 
             #if not vw:
             #    vw = 0
@@ -86,7 +127,7 @@ def execute(startTime,DIST_THRESH,avoid_ball=False):
             else:
                 vx_end,vy_end = vx,vy
 
-            if TARGET.dist(kub.state.homePos[kub.kubs_id])<DIST_THRESH :
+            if functions.dist(kub.state.homePos[kub.kubs_id],TARGET)<DIST_THRESH :
                 kub.move(0,0)
                 FLAG_move = True
             else:

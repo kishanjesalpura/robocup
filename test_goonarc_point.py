@@ -19,11 +19,9 @@ def run_function(id_,state):
 	print(kub.kubs_id)
 	g_fsm = GoOnArc.GoOnArc()
 	g_fsm.add_kub(kub)
-        center = Vector2D(0,0)
-        g_fsm.add_center(center)
         kub_pos = kub.get_pos()
-        g_fsm.add_target(Vector2D(0, kub_pos.x))
-        #g_fsm.bigger_arc()
+        g_fsm.add_target(Vector2D(500,1000))
+        g_fsm.add_point_on_arc(Vector2D(0, 1000))
 	print('something before spin')
 	g_fsm.spin()
 	# 
@@ -48,4 +46,5 @@ while True:
 		run_function(3,state.stateB)
 		print('chal ja')
 		# break
+
 rospy.spin()
