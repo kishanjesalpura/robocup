@@ -13,7 +13,7 @@ from velocity.run import *
 from krssg_ssl_msgs.srv import *
 from utils.math_functions import *
 import krssg_ssl_msgs.msg
-import _turnAround_, _GoToPoint_
+from role import _turnAround_, _GoToPoint_,_PassRecv_
 import time
 rospy.wait_for_service('bsServer',)
 getState = rospy.ServiceProxy('bsServer',bsServer)
@@ -256,6 +256,7 @@ class Pass_Recieve(behavior.Behavior):
         self.target_point = getPointBehindTheBall(self.kub.state.ballPos, self.theta, 2)
         #self.target_point = self.kub.state.ballPos
         _GoToPoint_.init(self.kub, self.target_point,0)
+	
 
     def execute_reach_ball(self):
         start_time = rospy.Time.now()
@@ -433,11 +434,12 @@ class Pass_Recieve(behavior.Behavior):
         pass
 
     def on_enter_insidealpha(self):
-        pass
+	_PassRecv_.init(_kub=self.kub,target=self.kub.state.ballPos)
 
     def execute_insidealpha(self):
         start_time = rospy.Time.now()
         start_time = 1.0*start_time.secs + 1.0*start_time.nsecs/pow(10,9)   
+	
         generatingfunction = _PassRecv_.execute('inside_alpha', start_time, BOT_RADIUS*1.2)
         for gf in generatingfunction:
             self.kub,target_point= gf
@@ -445,17 +447,19 @@ class Pass_Recieve(behavior.Behavior):
                 break
     
     def on_exit_insidealpha(self):
-        pass
+        _PassRecv_.init(self.kub,self.circle.center,self.circle.radius,self.kub.state.ballPos)
     
     def on_enter_outsidecircle(self):
-        pass
+        _PassRecv_.init(self.kub,self.kub.state.ballPos,self.circle.center,self.circle.radius)
     
     def execute_outsidecircle(self):
         start_time = rospy.Time.now()
         start_time = 1.0*start_time.secs + 1.0*start_time.nsecs/pow(10,9)   
         generatingfunction = _PassRecv_.execute('outside_circle', start_time, BOT_RADIUS*1.2)
         for gf in generatingfunction:
-            self.kub,target_point = gf
+	    if dist(self.circle.center,self.kub.get_pos())<=self.radius:
+		break
+	    self.kub,target_point = gf
             if vicinity_points(self.kub.state.ballPos,self.kub.get_pos(),thresh=BOT_RADIUS):
                 break
 
@@ -463,15 +467,18 @@ class Pass_Recieve(behavior.Behavior):
         pass
 
     def on_enter_insidecircle(self):
-        pass
+        _PassRecv_.init(self.kub,self.kub.state.ballPos,self.circle.center,self.circle.radius)
+
     def execute_insidecircle(self):
         start_time = rospy.Time.now()
         start_time = 1.0*start_time.secs + 1.0*start_time.nsecs/pow(10,9)   
         generatingfunction = _PassRecv_.execute('inside_circle', start_time, BOT_RADIUS*1.2)
         for gf in generatingfunction:
+            
+	    if dist(self.circle.center,self.kub.get_pos())>=self.radius:
+		break
             self.kub,target_point = gf
             if vicinity_points(self.kub.state.ballPos,self.kub.get_pos(),thresh=BOT_RADIUS):
                 break
     def on_exit_insidecircle(self):
         pass
-

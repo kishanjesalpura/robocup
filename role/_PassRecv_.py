@@ -8,9 +8,17 @@ from krssg_ssl_msgs.msg import gr_Commands
 from krssg_ssl_msgs.msg import gr_Robot_Command
 from utils.geometry import Vector2D
 from utils import config, functions
+from utils.math_functions import *
 import krssg_ssl_msgs.srv as srv
 import math
 import numpy as np
+
+DIST_THRESH = 75
+dboxp = Vector2D((abs(OUR_DBOX_X)-(DBOX_HEIGHT/2)),0)
+DRIBBLE_DIST = BOT_RADIUS*10
+BOT_BALL_THRESH = 0.9*BOT_RADIUS
+V_CLOSE=MAX_BOT_SPEED/30
+D_CLOSE=BOT_RADIUS*6
 
 kub = None
 start_time = None
@@ -31,7 +39,7 @@ try:
 except rospy.ServiceException, e:
     print("Error ", e)
 
-def init(_kub,center,radius,target):
+def init(_kub,target,center=None,radius=None):
     global kub,RADIUS,CENTER,FIRST_CALL,FLLAG_move,TARGET
     kub = _kub
     TARGET = Vector2D()
@@ -66,9 +74,12 @@ def execute_outside_circle():
         veldir = math.atan2(kub.state.ballPos.y-kub.get_pos().y,kub.state.ballPos.x-kub.get_pos().x)    
     else:
         veldir = math.atan2(kub.state.ballVel.y, kub.state.ballVel.x)
+ 
     point=getPointBehindTheBall(kub.state.ballPos,veldir)
     magnitude=V_CLOSE + dist(point,kub.get_pos())*(MAX_BOT_SPEED/4-V_CLOSE)/(D_CLOSE)
     l = dist(CENTER,kub.get_pos())
+    if l<=RADIUS:
+    	return None
     beta = math.asin(RADIUS/l)
     theta = math.atan(kub.get_pos().y - CENTER.y)/(kub.get_pos().x - CENTER.x)
     angle1 = theta + beta
@@ -88,11 +99,17 @@ def execute_outside_circle():
         sinangle = math.sin(angle2)*multiplier2
     relvel=Vector2D(magnitude*cosangle,magnitude*sinangle)
     FinalVel=relvel+kub.state.ballVel
+    print("FinalVel=",FinalVel.x,FinalVel.y)
+    print("ballVelocity=",kub.state.ballVel.x,kub.state.ballVel.y)
+    print("Relative Velocity=",relvel.x,relvel.y)
     vx=FinalVel.x
     vy=FinalVel.y
     return vx,vy
 
 def excecute_inside_alpha():
+    l = dist(CENTER,kub.get_pos())
+    if l<=RADIUS:
+    	return None
     if kub.state.ballVel.x == 0 and kub.state.ballVel.y == 0:
         veldir = math.atan2(kub.state.ballPos.y-kub.get_pos().y,kub.state.ballPos.x-kub.get_pos().x)    
     else:
@@ -107,6 +124,7 @@ def excecute_inside_alpha():
     
 def execute(strategy, startTime,DIST_THRESH,avoid_ball=False):
     global getState,TARGET, start_time,FIRST_CALL,FLAG_turn,FLAG_move,kub,prev_state,vx_end,vy_end
+    
 
     while not (FLAG_move):
 
@@ -124,12 +142,15 @@ def execute(strategy, startTime,DIST_THRESH,avoid_ball=False):
             t = rospy.Time.now()
             t = t.secs + 1.0*t.nsecs/pow(10,9)
             
-            strategy = 'execute_' + strategy
+            func_name = 'execute_' + strategy+ '()'
             
-            velocity_planner = getattr(strategy)
 
-            vx, vy = velocity_planner()
-
+            out = eval(func_name)
+	    if out is None:
+            	FLAG_move=True
+                vx, vy = vx_end,vy_end
+	    else:
+		vx, vy = out
             #if not vw:
             #    vw = 0
 
