@@ -17,7 +17,9 @@ start_time = None
 TARGET = None
 CENTER = None
 RADIUS = None
+ROTATE = True
 FLAG_move = False
+FLAG_turn = False
 POINT = None
 rotate = False
 TAKE_BIGGER_ARC = False
@@ -35,7 +37,7 @@ except rospy.ServiceException, e:
     print("Error ", e)
 
 def init(_kub,target,center,radius,rotate, point, take_bigger_arc):
-    global kub,TARGET,RADIUS,CENTER,FLAG_move,FIRST_CALL,POINT,TAKE_BIGGER_ARC
+    global kub,TARGET,RADIUS,CENTER,FLAG_move,FIRST_CALL,POINT,TAKE_BIGGER_ARC,ROTATE
     kub = _kub
     TARGET = Vector2D()
     TARGET.x = target.x
@@ -44,6 +46,7 @@ def init(_kub,target,center,radius,rotate, point, take_bigger_arc):
     CENTER.x = center.x
     CENTER.y = center.y
     RADIUS = radius
+    ROTATE = rotate
     FLAG_move = False
     FIRST_CALL = True
     POINT = point
@@ -55,6 +58,13 @@ v_norm_prev = 0
 def velocity_planner(bot_pos):
     global v_tan_prev, v_norm_prev
     #PD controller
+    # angular velocity control
+    if ROTATE:
+        kub_pos = kub.get_pos()
+        bot_ball_dir = math.atan2(kub_pos.y-kub.state.ballPos.y, kub_pos.x-kub.state.ballPos.x)
+        vw = run_w.Get_Omega(kub.kubs_id, bot_ball_dir, kub.state.homePos)
+    else:
+        vw = 0
     # tangential velocity controller
     consts_tan = np.array([4,0.05])
     if POINT is None:
@@ -96,12 +106,12 @@ def velocity_planner(bot_pos):
         vy = config.MAX_BOT_SPEED*math.sin(alpha)
     #print("vx,vy", vx, vy)
     print("bot_pos", bot_pos)
-    return vx,vy
+    return vx,vy,vw
 
-def execute(startTime,DIST_THRESH,avoid_ball=False):
+def execute(startTime,DIST_THRESH,ROTATION_FACTOR,avoid_ball=False):
     global getState,TARGET, start_time,FIRST_CALL,FLAG_turn,FLAG_move,kub,prev_state,vx_end,vy_end
 
-    while not (FLAG_move):
+    while not (FLAG_move and FLAG_turn):
 
 
         try:
@@ -117,7 +127,7 @@ def execute(startTime,DIST_THRESH,avoid_ball=False):
             t = rospy.Time.now()
             t = t.secs + 1.0*t.nsecs/pow(10,9)
 
-            vx, vy = velocity_planner(kub.get_pos())
+            vx, vy, vw = velocity_planner(kub.get_pos())
 
             #if not vw:
             #    vw = 0
@@ -132,6 +142,13 @@ def execute(startTime,DIST_THRESH,avoid_ball=False):
                 FLAG_move = True
             else:
                 kub.move(vx, vy)
+
+            if abs(functions.normalize_angle(kub.state.homePos[kub.kubs_id].theta-rotate))<ROTATION_FACTOR:
+                kub.turn(0)
+                # print("Angle completed")
+                FLAG_turn = True
+            else:
+                kub.turn(vw)
 
             kub.execute()
             yield kub,TARGET

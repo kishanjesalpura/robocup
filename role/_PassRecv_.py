@@ -17,7 +17,7 @@ DIST_THRESH = 75
 dboxp = Vector2D((abs(OUR_DBOX_X)-(DBOX_HEIGHT/2)),0)
 DRIBBLE_DIST = BOT_RADIUS*10
 BOT_BALL_THRESH = 0.9*BOT_RADIUS
-V_CLOSE=MAX_BOT_SPEED/30
+V_CLOSE=MAX_BOT_SPEED/5
 D_CLOSE=BOT_RADIUS*6
 
 kub = None
@@ -45,10 +45,12 @@ def init(_kub,target,center=None,radius=None):
     TARGET = Vector2D()
     TARGET.x = target.x
     TARGET.y = target.y
-    CENTER = Vector2D()
-    CENTER.x = center.x
-    CENTER.y = center.y
-    RADIUS = radius
+    if center is not None:
+        CENTER = Vector2D()
+        CENTER.x = center.x
+        CENTER.y = center.y
+    if radius is not None:
+        RADIUS = radius
     FLAG_move = False
 
 def execute_inside_circle():
@@ -59,7 +61,7 @@ def execute_inside_circle():
         veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
     point=getPointBehindTheBall(self.kub.state.ballPos,veldir)
     #theta = math.atan2(point.y-self.kub.get_pos().y, point.x-self.kub.get_pos().x)
-    magnitude=V_CLOSE + dist(point,self.kub.get_pos())(MAX_BOT_SPEED/4-V_CLOSE)/(D_CLOSE)
+    magnitude=V_CLOSE + dist(point,self.kub.get_pos())(MAX_BOT_SPEED/2-V_CLOSE)/(D_CLOSE)
     l = dist(self.circle.center,self.kub.get_pos())
     if self.circle.center == self.circle1.center:
         relvel_dir = normal_dir + (math.pi*l)/(2*self.circle.radius)
@@ -70,15 +72,15 @@ def execute_inside_circle():
     return FinalVel.x, FinalVel.y
 
 def execute_outside_circle():
-    if kub.state.ballVel.x == 0 and kub.state.ballVel.y == 0:
+    if (kub.state.ballVel.x**2+kub.state.ballVel.y**2) <= 0.1:
         veldir = math.atan2(kub.state.ballPos.y-kub.get_pos().y,kub.state.ballPos.x-kub.get_pos().x)    
     else:
         veldir = math.atan2(kub.state.ballVel.y, kub.state.ballVel.x)
  
     point=getPointBehindTheBall(kub.state.ballPos,veldir)
-    magnitude=V_CLOSE + dist(point,kub.get_pos())*(MAX_BOT_SPEED/4-V_CLOSE)/(D_CLOSE)
+    magnitude=V_CLOSE + dist(point,kub.get_pos())*(MAX_BOT_SPEED/2-V_CLOSE)/(D_CLOSE)
     l = dist(CENTER,kub.get_pos())
-    if l<=RADIUS:
+    if l<RADIUS:
     	return None
     beta = math.asin(RADIUS/l)
     theta = math.atan(kub.get_pos().y - CENTER.y)/(kub.get_pos().x - CENTER.x)
@@ -106,9 +108,9 @@ def execute_outside_circle():
     vy=FinalVel.y
     return vx,vy
 
-def excecute_inside_alpha():
+def execute_inside_alpha():
     l = dist(CENTER,kub.get_pos())
-    if l<=RADIUS:
+    if l>RADIUS:
     	return None
     if kub.state.ballVel.x == 0 and kub.state.ballVel.y == 0:
         veldir = math.atan2(kub.state.ballPos.y-kub.get_pos().y,kub.state.ballPos.x-kub.get_pos().x)    
@@ -116,7 +118,7 @@ def excecute_inside_alpha():
         veldir = math.atan2(kub.state.ballVel.y, kub.state.ballVel.x)
     point=getPointBehindTheBall(kub.state.ballPos,veldir)
     kub_pos = kub.get_pos()
-    magnitude=V_CLOSE + dist(point,kub.get_pos())*(MAX_BOT_SPEED/4-V_CLOSE)/(D_CLOSE)
+    magnitude=V_CLOSE + dist(point,kub.get_pos())*(MAX_BOT_SPEED/2-V_CLOSE)/(D_CLOSE)
     theta = math.atan2(point.y-kub_pos.y, point.x-kub_pos.x)
     vx = magnitude*math.cos(theta)
     vy = magnitude*math.sin(theta)

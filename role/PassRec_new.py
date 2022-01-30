@@ -13,7 +13,7 @@ from velocity.run import *
 from krssg_ssl_msgs.srv import *
 from utils.math_functions import *
 import krssg_ssl_msgs.msg
-from role import _turnAround_, _GoToPoint_,_PassRecv_
+from role import _turnAround_, _GoToPoint_,_PassRecv_,_GoOnArc_
 import time
 rospy.wait_for_service('bsServer',)
 getState = rospy.ServiceProxy('bsServer',bsServer)
@@ -92,6 +92,9 @@ class Pass_Recieve(behavior.Behavior):
             Pass_Recieve.State.setup,lambda: True, 'pass complete')
         
         self.add_transition(Pass_Recieve.State.setup,
+            behavior.Behavior.State.completed,lambda: kub_has_ball(self.kub.state,self.kub.kubs_id),'setup')
+
+        self.add_transition(Pass_Recieve.State.setup,
            Pass_Recieve.State.insidealpha,lambda:self.bot_inside_alpha() and (not kub_has_ball(self.kub.state,self.kub.kubs_id)),'inside alpha')
         
         self.add_transition(Pass_Recieve.State.setup,
@@ -109,8 +112,6 @@ class Pass_Recieve(behavior.Behavior):
         self.add_transition(Pass_Recieve.State.insidealpha,
             Pass_Recieve.State.setup,lambda: True,'back to setup')
         
-        self.add_transition(Pass_Recieve.State.setup,
-            behavior.Behavior.State.completed,lambda: kub_has_ball(self.kub.state,self.kub.kubs_id),'setup')
         self.add_transition(Pass_Recieve.State.reach_ball,
 			behavior.Behavior.State.failed, lambda: self.behavior_failed, 'failed')
 		
@@ -212,9 +213,11 @@ class Pass_Recieve(behavior.Behavior):
         self.circle2 = Circle(center2,self.radius)
         if center2.dist(self.kub.get_pos()) < self.radius:
             self.circle = self.circle2
+            print(True)
             return True
         if center1.dist(self.kub.get_pos()) < self.radius:
             self.circle = self.circle1
+            print(True)
             return True
         return False 
 
@@ -451,6 +454,12 @@ class Pass_Recieve(behavior.Behavior):
     
     def on_enter_outsidecircle(self):
         _PassRecv_.init(self.kub,self.kub.state.ballPos,self.circle.center,self.circle.radius)
+        if self.kub.state.ballVel.x == 0 and self.kub.state.ballVel.y <= 0.01:
+            veldir = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)    
+        else:
+            veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
+        point=getPointBehindTheBall(self.kub.state.ballPos,veldir)
+        _GoOnArc_.init(self.kub,self.kub.state.ballPos, self.circle.center, self.radius,True, point, False)
     
     def execute_outsidecircle(self):
         start_time = rospy.Time.now()
@@ -459,6 +468,21 @@ class Pass_Recieve(behavior.Behavior):
         for gf in generatingfunction:
 	    if dist(self.circle.center,self.kub.get_pos())<=self.radius:
 		break
+	    self.kub,target_point = gf
+            if vicinity_points(self.kub.state.ballPos,self.kub.get_pos(),thresh=BOT_RADIUS):
+                break
+        start_time = rospy.Time.now()
+        start_time = 1.0*start_time.secs + 1.0*start_time.nsecs/pow(10,9)   
+        generatingfunction = _GoOnArc_.execute(start_time, 20, math.pi/360)
+        for gf in generatingfunction:
+            _GoOnArc_.TARGET = self.kub.state.ballPos
+            if self.kub.state.ballVel.x == 0 and self.kub.state.ballVel.y <= 0.01:
+                veldir = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)    
+            else:
+                veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
+            point=getPointBehindTheBall(self.kub.state.ballPos,veldir)
+            _GoOnArc_.POINT = point
+            _GoOnArc_.CENTER = self.circle.center
 	    self.kub,target_point = gf
             if vicinity_points(self.kub.state.ballPos,self.kub.get_pos(),thresh=BOT_RADIUS):
                 break
@@ -475,7 +499,7 @@ class Pass_Recieve(behavior.Behavior):
         generatingfunction = _PassRecv_.execute('inside_circle', start_time, BOT_RADIUS*1.2)
         for gf in generatingfunction:
             
-	    if dist(self.circle.center,self.kub.get_pos())>=self.radius:
+	    if dist(self.circle.center,self.kub.get_pos())>self.radius:
 		break
             self.kub,target_point = gf
             if vicinity_points(self.kub.state.ballPos,self.kub.get_pos(),thresh=BOT_RADIUS):
