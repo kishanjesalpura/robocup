@@ -26,6 +26,7 @@ RADIUS = None
 CENTER = None
 TARGET = None
 FLAG_move = False
+VELDIR = None
 vx_end = 0
 vy_end = 0
 
@@ -39,8 +40,8 @@ try:
 except rospy.ServiceException, e:
     print("Error ", e)
 
-def init(_kub,target,center=None,radius=None):
-    global kub,RADIUS,CENTER,FIRST_CALL,FLLAG_move,TARGET
+def init(_kub,target,veldir, center=None,radius=None):
+    global kub,RADIUS,CENTER,FIRST_CALL,FLLAG_move,TARGET, VELDIR
     kub = _kub
     TARGET = Vector2D()
     TARGET.x = target.x
@@ -51,15 +52,14 @@ def init(_kub,target,center=None,radius=None):
         CENTER.y = center.y
     if radius is not None:
         RADIUS = radius
+    VELDIR = veldir
     FLAG_move = False
 
 def execute_inside_circle():
     normal_dir = math.atan2(self.kub.get_pos().y - self.circle.center.y),(self.kub.get_pos().x - self.circle.center.x)
-    if self.kub.state.ballVel.x == 0 and self.kub.state.ballVel.y == 0:
-        veldir = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)    
-    else:
-        veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
-    point=getPointBehindTheBall(self.kub.state.ballPos,veldir)
+    #if self.kub.state.ballVel.x == 0 and self.kub.state.ballVel.y == 0:
+    #    VELDIR = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)    
+    point=getPointBehindTheBall(self.kub.state.ballPos,VELDIR)
     #theta = math.atan2(point.y-self.kub.get_pos().y, point.x-self.kub.get_pos().x)
     magnitude=V_CLOSE + dist(point,self.kub.get_pos())(MAX_BOT_SPEED/2-V_CLOSE)/(D_CLOSE)
     l = dist(self.circle.center,self.kub.get_pos())
@@ -72,16 +72,13 @@ def execute_inside_circle():
     return FinalVel.x, FinalVel.y
 
 def execute_outside_circle():
-    if (kub.state.ballVel.x**2+kub.state.ballVel.y**2) <= 0.1:
-        veldir = math.atan2(kub.state.ballPos.y-kub.get_pos().y,kub.state.ballPos.x-kub.get_pos().x)    
-    else:
-        veldir = math.atan2(kub.state.ballVel.y, kub.state.ballVel.x)
- 
-    point=getPointBehindTheBall(kub.state.ballPos,veldir)
+    #if (kub.state.ballVel.x**2+kub.state.ballVel.y**2) <= 0.1:
+    #    VELDIR = math.atan2(kub.state.ballPos.y-kub.get_pos().y,kub.state.ballPos.x-kub.get_pos().x)    
+    point=getPointBehindTheBall(kub.state.ballPos,VELDIR)
     magnitude=V_CLOSE + dist(point,kub.get_pos())*(MAX_BOT_SPEED/2-V_CLOSE)/(D_CLOSE)
     l = dist(CENTER,kub.get_pos())
     if l<RADIUS:
-    	return None
+        return None
     beta = math.asin(RADIUS/l)
     theta = math.atan(kub.get_pos().y - CENTER.y)/(kub.get_pos().x - CENTER.x)
     angle1 = theta + beta
@@ -93,7 +90,7 @@ def execute_outside_circle():
         multiplier1 = -1
     if dist(kub_pos + Vector2D(BOT_RADIUS*math.cos(angle2),BOT_RADIUS*math.sin(angle2)),CENTER) > dist(kub_pos - Vector2D(BOT_RADIUS*math.cos(angle2),BOT_RADIUS*math.sin(angle2)),CENTER):
         multiplier2 = -1
-    if (math.cos(veldir)*math.cos(angle1) + math.sin(veldir)*math.sin(angle1))*multiplier1 < (math.cos(veldir)*math.cos(angle2) + math.sin(veldir)*math.sin(angle2))*multiplier2:
+    if (math.cos(VELDIR)*math.cos(angle1) + math.sin(VELDIR)*math.sin(angle1))*multiplier1 < (math.cos(VELDIR)*math.cos(angle2) + math.sin(VELDIR)*math.sin(angle2))*multiplier2:
         cosangle = math.cos(angle1)*multiplier1
         sinangle = math.sin(angle1)*multiplier1
     else:
@@ -109,15 +106,13 @@ def execute_outside_circle():
     return vx,vy
 
 def execute_inside_alpha():
-    l = dist(CENTER,kub.get_pos())
-    if l>RADIUS:
-    	return None
-    if kub.state.ballVel.x == 0 and kub.state.ballVel.y == 0:
-        veldir = math.atan2(kub.state.ballPos.y-kub.get_pos().y,kub.state.ballPos.x-kub.get_pos().x)    
-    else:
-        veldir = math.atan2(kub.state.ballVel.y, kub.state.ballVel.x)
-    point=getPointBehindTheBall(kub.state.ballPos,veldir)
     kub_pos = kub.get_pos()
+    l = dist(CENTER,kub_pos)
+    if l>RADIUS:
+        return None
+    #if kub.state.ballVel.x == 0 and kub.state.ballVel.y == 0:
+    #    VELDIR = math.atan2(kub.state.ballPos.y-kub.get_pos().y,kub.state.ballPos.x-kub.get_pos().x)    
+    point=getPointBehindTheBall(kub.state.ballPos,VELDIR)
     magnitude=V_CLOSE + dist(point,kub.get_pos())*(MAX_BOT_SPEED/2-V_CLOSE)/(D_CLOSE)
     theta = math.atan2(point.y-kub_pos.y, point.x-kub_pos.x)
     vx = magnitude*math.cos(theta)
@@ -126,7 +121,7 @@ def execute_inside_alpha():
     
 def execute(strategy, startTime,DIST_THRESH,avoid_ball=False):
     global getState,TARGET, start_time,FIRST_CALL,FLAG_turn,FLAG_move,kub,prev_state,vx_end,vy_end
-    
+
 
     while not (FLAG_move):
 
@@ -143,16 +138,16 @@ def execute(strategy, startTime,DIST_THRESH,avoid_ball=False):
 
             t = rospy.Time.now()
             t = t.secs + 1.0*t.nsecs/pow(10,9)
-            
+
             func_name = 'execute_' + strategy+ '()'
-            
+
 
             out = eval(func_name)
-	    if out is None:
-            	FLAG_move=True
+        if out is None:
+            FLAG_move=True
                 vx, vy = vx_end,vy_end
-	    else:
-		vx, vy = out
+        else:
+            vx, vy = out
             #if not vw:
             #    vw = 0
 

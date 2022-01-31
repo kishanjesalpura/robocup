@@ -188,9 +188,9 @@ class Pass_Recieve(behavior.Behavior):
 
     def bot_inside_alpha(self):
         if self.kub.state.ballVel.x == 0 and self.kub.state.ballVel.y == 0:
-	    veldir = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)   
+            veldir = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)   
         else:
-	    veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
+            veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
         point = getPointBehindTheBall(self.kub.state.ballPos,veldir)
         #angle = angle_diff(point,self.kub.get_pos())
         angle = math.atan2(point.y - self.kub.get_pos().y,point.x - self.kub.get_pos().x)
@@ -199,10 +199,10 @@ class Pass_Recieve(behavior.Behavior):
         return False
     
     def insideofcircle(self):
-	if self.kub.state.ballVel.x == 0 and self.kub.state.ballVel.y == 0:
-	    veldir = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)    
+        if self.kub.state.ballVel.x == 0 and self.kub.state.ballVel.y == 0:
+            veldir = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)    
         else:
-	    veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
+            veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
         v1 = Vector2D(self.radius*math.sin(self.alpha)*math.cos(veldir),self.radius*math.sin(self.alpha)*math.sin(veldir))
         v2 = Vector2D(-self.radius*math.cos(self.alpha)*math.sin(veldir),self.radius*math.cos(self.alpha)*math.cos(veldir))
         v3 = Vector2D(self.radius*math.cos(self.alpha)*math.sin(veldir),-self.radius*math.cos(self.alpha)*math.cos(veldir))
@@ -225,10 +225,10 @@ class Pass_Recieve(behavior.Behavior):
         if self.bot_inside_alpha() or self.insideofcircle():
             return False
 	print(self.insideofcircle())
-	if self.kub.state.ballVel.x == 0 and self.kub.state.ballVel.y == 0:
-	    veldir = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)    
+        if self.kub.state.ballVel.x == 0 and self.kub.state.ballVel.y == 0:
+            veldir = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)    
         else:
-	    veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
+            veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
         v1 = Vector2D(self.radius*math.sin(self.alpha)*math.cos(veldir),self.radius*math.sin(self.alpha)*math.sin(veldir))
         v2 = Vector2D(-self.radius*math.cos(self.alpha)*math.sin(veldir),self.radius*math.cos(self.alpha)*math.cos(veldir))
         v3 = Vector2D(self.radius*math.cos(self.alpha)*math.sin(veldir),-self.radius*math.cos(self.alpha)*math.cos(veldir))
@@ -431,13 +431,20 @@ class Pass_Recieve(behavior.Behavior):
         self.kub.execute()
         pass
     def execute_setup(self):
+        ball_vel = self.kub.state.ballVel
+        if ball_vel.x == 0 and ball_vel.y == 0:
+            bot_pos = self.kub.get_pos()
+            ball_pos = self.kub.state.ballPos
+            self.veldir = math.atan2(ball_pos.y-bot_pos.y, ball_pos.x-bot_pos.x)
+        else:
+            self.veldir = math.atan2(self.kub.state.ballVel.y, self.kub.state.ballVel.x)
         pass
         
     def on_exit_setup(self):
         pass
 
     def on_enter_insidealpha(self):
-	_PassRecv_.init(_kub=self.kub,target=self.kub.state.ballPos)
+        _PassRecv_.init(self.kub,self.kub.state.ballPos,self.veldir)
 
     def execute_insidealpha(self):
         start_time = rospy.Time.now()
@@ -450,10 +457,10 @@ class Pass_Recieve(behavior.Behavior):
                 break
     
     def on_exit_insidealpha(self):
-        _PassRecv_.init(self.kub,self.circle.center,self.circle.radius,self.kub.state.ballPos)
+        pass
     
     def on_enter_outsidecircle(self):
-        _PassRecv_.init(self.kub,self.kub.state.ballPos,self.circle.center,self.circle.radius)
+        _PassRecv_.init(self.kub,self.kub.state.ballPos,self.veldir,self.circle.center,self.circle.radius)
         if self.kub.state.ballVel.x == 0 and self.kub.state.ballVel.y <= 0.01:
             veldir = math.atan2(self.kub.state.ballPos.y-self.kub.get_pos().y,self.kub.state.ballPos.x-self.kub.get_pos().x)    
         else:
@@ -491,7 +498,7 @@ class Pass_Recieve(behavior.Behavior):
         pass
 
     def on_enter_insidecircle(self):
-        _PassRecv_.init(self.kub,self.kub.state.ballPos,self.circle.center,self.circle.radius)
+        _PassRecv_.init(self.kub,self.kub.state.ballPos,self.veldir,self.circle.center,self.circle.radius)
 
     def execute_insidecircle(self):
         start_time = rospy.Time.now()
